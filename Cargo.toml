@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "aes-gcm",
+    "argon2",
+    "pbkdf2"
+]
