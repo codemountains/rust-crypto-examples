@@ -2,7 +2,7 @@
 
 ## Using a aes_gcm crate
 
-- [RustCrypto: PBKDF2](https://crates.io/crates/aes-gcm)
+- [RustCrypto: AES-GCM](https://crates.io/crates/aes-gcm)
 
 ## Run
 

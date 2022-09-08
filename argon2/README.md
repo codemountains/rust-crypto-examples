@@ -2,7 +2,7 @@
 
 ## Using a pbkdf2 crate
 
-- [RustCrypto: PBKDF2](https://crates.io/crates/argon2)
+- [RustCrypto: Argon2](https://crates.io/crates/argon2)
 
 ## Run
 
