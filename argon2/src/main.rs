@@ -1,26 +1,26 @@
 use anyhow::anyhow;
-use argon2::password_hash::SaltString;
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use argon2::password_hash::{Ident, SaltString};
+use argon2::{Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version};
 use dotenv::dotenv;
 use std::env;
 
-struct PHCString {
+struct EncryptionData {
     salt: String,
     variant: String,
-    version: String,
-    time_cost: String,
-    memory_cost: String,
-    parallelism_cost: String,
+    version: u32,
+    time_cost: u32,
+    memory_cost: u32,
+    parallelism_cost: u32,
 }
 
-impl PHCString {
+impl EncryptionData {
     fn new(
         salt: String,
         variant: String,
-        version: String,
-        time_cost: String,
-        memory_cost: String,
-        parallelism_cost: String,
+        version: u32,
+        time_cost: u32,
+        memory_cost: u32,
+        parallelism_cost: u32,
     ) -> Self {
         Self {
             salt,
@@ -34,12 +34,20 @@ impl PHCString {
 }
 
 fn main() -> anyhow::Result<()> {
-    let phc = init()?;
+    let encryption_data = init()?;
 
     let password = "password".to_string();
+
+    argon2_default(&password, &encryption_data)?;
+    argon2_custom(&password, &encryption_data)?;
+
+    Ok(())
+}
+
+fn argon2_default(password: &str, encryption_data: &EncryptionData) -> anyhow::Result<()> {
     let bin_password = password.as_bytes();
 
-    let salt_string = SaltString::new(&phc.salt).map_err(|e| anyhow!(e))?;
+    let salt_string = SaltString::new(&encryption_data.salt).map_err(|e| anyhow!(e))?;
     println!("salt: {}", salt_string);
 
     // Argon2 with default params (Argon2id v19)
@@ -49,21 +57,11 @@ fn main() -> anyhow::Result<()> {
     // https://github.com/P-H-C/phc-string-format/blob/master/phc-sf-spec.md
     let password_hash = argon2
         .hash_password(bin_password, &salt_string)
-        .map_err(|e| anyhow!(e))?;
+        .map_err(|e| anyhow!(e))?
+        .to_string();
     println!("PHC string: {}", password_hash);
 
-    // Verify password against PHC string.
-    let phc_string = format!(
-        "${}$v={}$m={},t={},p={}${}${}",
-        phc.variant,
-        phc.version,
-        phc.memory_cost,
-        phc.time_cost,
-        phc.parallelism_cost,
-        salt_string,
-        password_hash.hash.ok_or(anyhow!("hash error"))?
-    );
-    let parsed_hash = PasswordHash::new(&phc_string).map_err(|e| anyhow!(e))?;
+    let parsed_hash = PasswordHash::new(&password_hash).map_err(|e| anyhow!(e))?;
     println!(
         "authentication result: {}",
         Argon2::default()
@@ -74,7 +72,46 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn init() -> anyhow::Result<PHCString> {
+fn argon2_custom(password: &str, encryption_data: &EncryptionData) -> anyhow::Result<()> {
+    let bin_password = password.as_bytes();
+
+    let salt_string = SaltString::new(&encryption_data.salt).map_err(|e| anyhow!(e))?;
+    println!("salt: {}", salt_string);
+
+    // Argon2 with customized params
+    let ident = Ident::try_from(encryption_data.variant.as_str()).map_err(|e| anyhow!(e))?;
+    let algorithm = Algorithm::try_from(ident).map_err(|e| anyhow!(e))?; // = Algorithm::Argon2id
+    let version = Version::try_from(encryption_data.version).map_err(|e| anyhow!(e))?; // = Version::V0x13
+
+    let params = Params::new(
+        encryption_data.memory_cost,
+        encryption_data.time_cost,
+        encryption_data.parallelism_cost,
+        None,
+    )
+    .map_err(|e| anyhow!(e))?;
+    let argon2 = Argon2::new(algorithm, version, params);
+
+    // Hash password to PHC string ($argon2id$v=19$...)
+    // https://github.com/P-H-C/phc-string-format/blob/master/phc-sf-spec.md
+    let password_hash = argon2
+        .hash_password(bin_password, &salt_string)
+        .map_err(|e| anyhow!(e))?
+        .to_string();
+    println!("PHC string: {}", password_hash);
+
+    let parsed_hash = PasswordHash::new(&password_hash).map_err(|e| anyhow!(e))?;
+    println!(
+        "authentication result: {}",
+        Argon2::default()
+            .verify_password(bin_password, &parsed_hash)
+            .is_ok()
+    );
+
+    Ok(())
+}
+
+fn init() -> anyhow::Result<EncryptionData> {
     dotenv().ok();
 
     let salt = env::var_os("ARGON2_PHC_SALT")
@@ -88,21 +125,25 @@ fn init() -> anyhow::Result<PHCString> {
     let version = env::var_os("ARGON2_PHC_VERSION")
         .expect("ARGON2_PHC_VERSION is undefined.")
         .into_string()
-        .map_err(|_| anyhow!("ARGON2_PHC_VERSION is invalid value."))?;
+        .map_err(|_| anyhow!("ARGON2_PHC_VERSION is invalid value."))?
+        .parse::<u32>()?;
     let time_cost = env::var_os("ARGON2_PHC_TIME_COST")
         .expect("ARGON2_PHC_TIME_COST is undefined.")
         .into_string()
-        .map_err(|_| anyhow!("ARGON2_PHC_TIME_COST is invalid value."))?;
+        .map_err(|_| anyhow!("ARGON2_PHC_TIME_COST is invalid value."))?
+        .parse::<u32>()?;
     let memory_cost = env::var_os("ARGON2_PHC_MEMORY_COST")
         .expect("ARGON2_PHC_MEMORY_COST is undefined.")
         .into_string()
-        .map_err(|_| anyhow!("ARGON2_PHC_MEMORY_COST is invalid value."))?;
+        .map_err(|_| anyhow!("ARGON2_PHC_MEMORY_COST is invalid value."))?
+        .parse::<u32>()?;
     let parallelism_cost = env::var_os("ARGON2_PHC_PARALLELISM_COST")
         .expect("ARGON2_PHC_PARALLELISM_COST is undefined.")
         .into_string()
-        .map_err(|_| anyhow!("ARGON2_PHC_PARALLELISM_COST is invalid value."))?;
+        .map_err(|_| anyhow!("ARGON2_PHC_PARALLELISM_COST is invalid value."))?
+        .parse::<u32>()?;
 
-    Ok(PHCString::new(
+    Ok(EncryptionData::new(
         salt,
         variant,
         version,
