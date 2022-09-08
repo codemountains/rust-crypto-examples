@@ -6,7 +6,7 @@
 
 ## Run
 
-1. Create `.env` in root directory.
+1. Create `.env`
 2. cargo run
 
 ```shell
