@@ -47,15 +47,6 @@ fn pbkdf2_default(password: &str, encryption_data: &EncryptionData) -> anyhow::R
         .to_string();
     println!("PHC string: {}", password_hash);
 
-    // Verify password against PHC string
-    // let phc_string = format!(
-    //     "${}$i={},l={}${}${}",
-    //     phc.variant,
-    //     phc.iteration,
-    //     salt_string.len(),
-    //     salt_string,
-    //     password_hash.hash.ok_or(anyhow!("hash error"))?
-    // );
     let parsed_hash = PasswordHash::new(&password_hash).map_err(|e| anyhow!(e))?;
     println!(
         "{}",
