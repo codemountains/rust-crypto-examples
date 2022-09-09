@@ -9,14 +9,14 @@ use std::{env, str};
 struct EncryptionKey(String);
 struct EncryptionNonce(String);
 
-impl EncryptionKey {
-    fn new(key: String) -> Self {
+impl From<String> for EncryptionKey {
+    fn from(key: String) -> Self {
         Self(key)
     }
 }
 
-impl EncryptionNonce {
-    fn new(nonce: String) -> Self {
+impl From<String> for EncryptionNonce {
+    fn from(nonce: String) -> Self {
         Self(nonce)
     }
 }
@@ -60,15 +60,17 @@ fn init() -> anyhow::Result<(EncryptionKey, EncryptionNonce)> {
     let key = env::var_os("AES_GCM_KEY")
         .expect("AES_GCM_KEY is undefined.")
         .into_string()
-        .map_err(|_| anyhow!("AES_GCM_KEY is invalid value."))?;
+        .map_err(|_| anyhow!("AES_GCM_KEY is invalid value."))?
+        .into();
 
     // Nonce: 96-bits; unique per message
     let nonce = env::var_os("AES_GCM_NONCE")
         .expect("AES_GCM_NONCE is undefined.")
         .into_string()
-        .map_err(|_| anyhow!("AES_GCM_NONCE is invalid value."))?;
+        .map_err(|_| anyhow!("AES_GCM_NONCE is invalid value."))?
+        .into();
 
-    Ok((EncryptionKey::new(key), EncryptionNonce::new(nonce)))
+    Ok((key, nonce))
 }
 
 fn aes_encrypt(contents: &[u8], key: &[u8], nonce: &[u8]) -> anyhow::Result<Vec<u8>> {
