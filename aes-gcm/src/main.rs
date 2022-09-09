@@ -31,7 +31,7 @@ fn main() -> anyhow::Result<()> {
 
     // encryption
     let encrypted_contents =
-        aes_encrypt(contents.as_bytes(), &key, &nonce).map_err(|e| anyhow!(e))?;
+        aes_encrypt(contents.as_bytes(), key, nonce).map_err(|e| anyhow!(e))?;
     println!("{:?}", encrypted_contents);
 
     // encode
@@ -45,8 +45,11 @@ fn main() -> anyhow::Result<()> {
     println!("{:?}", decoded_contents);
 
     // decryption
-    let url_cry = aes_decrypt(&encrypted_contents, &key, &nonce).map_err(|e| anyhow!(e))?;
-    println!("{}", str::from_utf8(&url_cry)?);
+    let plain_text = aes_decrypt(&encrypted_contents, key, nonce).map_err(|e| anyhow!(e))?;
+    let decrypted_contents: &str = str::from_utf8(&plain_text)?;
+    println!("{}", decrypted_contents);
+
+    assert_eq!(&contents, decrypted_contents);
 
     Ok(())
 }
@@ -74,16 +77,16 @@ fn aes_encrypt(contents: &[u8], key: &[u8], nonce: &[u8]) -> anyhow::Result<Vec<
 
     // encryption
     let cipher = Aes256Gcm::new(key);
-    Ok(cipher
+    cipher
         .encrypt(nonce, contents.as_ref())
-        .map_err(|e| anyhow!(e))?)
+        .map_err(|e| anyhow!(e))
 }
 
-fn aes_decrypt(cipher_data: &[u8], key: &[u8], nonce: &[u8]) -> anyhow::Result<Vec<u8>> {
+fn aes_decrypt(cipher_text: &[u8], key: &[u8], nonce: &[u8]) -> anyhow::Result<Vec<u8>> {
     let key = GenericArray::from_slice(key);
     let nonce = Nonce::from_slice(nonce);
 
     // decryption
     let cipher = Aes256Gcm::new(key);
-    Ok(cipher.decrypt(nonce, cipher_data).map_err(|e| anyhow!(e))?)
+    cipher.decrypt(nonce, cipher_text).map_err(|e| anyhow!(e))
 }
