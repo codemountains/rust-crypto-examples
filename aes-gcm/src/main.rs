@@ -3,10 +3,12 @@ use aes_gcm::aead::Aead;
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
 use anyhow::anyhow;
 use data_encoding::HEXLOWER;
-use dotenv::dotenv;
-use std::{env, str};
+use rand::seq::SliceRandom;
+use std::str;
 
+#[derive(Debug)]
 struct EncryptionKey(String);
+#[derive(Debug)]
 struct EncryptionNonce(String);
 
 impl From<String> for EncryptionKey {
@@ -20,6 +22,10 @@ impl From<String> for EncryptionNonce {
         Self(nonce)
     }
 }
+
+const RAND_BASE: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const KEY_SIZE: usize = 32;
+const NONCE_SIZE: usize = 12;
 
 fn main() -> anyhow::Result<()> {
     let (encryption_key, encryption_nonce) = init()?;
@@ -55,22 +61,23 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn init() -> anyhow::Result<(EncryptionKey, EncryptionNonce)> {
-    dotenv().ok();
+    let key = gen_rand_string(KEY_SIZE)?.into();
+    let nonce = gen_rand_string(NONCE_SIZE)?.into();
 
-    let key = env::var_os("AES_GCM_KEY")
-        .expect("AES_GCM_KEY is undefined.")
-        .into_string()
-        .map_err(|_| anyhow!("AES_GCM_KEY is invalid value."))?
-        .into();
-
-    // Nonce: 96-bits; unique per message
-    let nonce = env::var_os("AES_GCM_NONCE")
-        .expect("AES_GCM_NONCE is undefined.")
-        .into_string()
-        .map_err(|_| anyhow!("AES_GCM_NONCE is invalid value."))?
-        .into();
-
+    println!("{:?}, {:?}", key, nonce);
     Ok((key, nonce))
+}
+
+fn gen_rand_string(size: usize) -> anyhow::Result<String> {
+    let mut rng = &mut rand::thread_rng();
+    String::from_utf8(
+        RAND_BASE
+            .as_bytes()
+            .choose_multiple(&mut rng, size)
+            .cloned()
+            .collect(),
+    )
+    .map_err(|e| anyhow!(e))
 }
 
 fn aes_encrypt(contents: &[u8], key: &[u8], nonce: &[u8]) -> anyhow::Result<Vec<u8>> {
