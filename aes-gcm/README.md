@@ -6,8 +6,7 @@
 
 ## Run
 
-1. Create `.env`
-2. cargo run
+1. cargo run
 
 ```shell
 cd aes-gcm && cargo run --package aes-gcm-example
